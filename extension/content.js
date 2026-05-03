@@ -41,7 +41,7 @@ function grabFrame(video) {
 async function postFrame(blob) {
   const formData = new FormData();
   formData.append("file", blob, "frame.jpg");
-  const response = await fetch("http://localhost:8000/detect", {
+  const response = await fetch("http://localhost:8001/detect", {
     method: "POST",
     body: formData
   });
