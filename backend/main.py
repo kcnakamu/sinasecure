@@ -43,9 +43,15 @@ _transform = transforms.Compose([
 
 _LABELS = ["Real", "Fake"]
 
+DEBUG_DIR = Path(__file__).resolve().parent / "debug_frames"
+DEBUG_DIR.mkdir(exist_ok=True)
+MAX_DEBUG_FRAMES = 3
+_debug_count = 0
+
 
 @app.post("/detect")
 async def detect(file: UploadFile = File(...)):
+    global _debug_count
     raw = await file.read()
     img = Image.open(io.BytesIO(raw)).convert("RGB")
     input_tensor = _transform(img).unsqueeze(0)
@@ -53,4 +59,13 @@ async def detect(file: UploadFile = File(...)):
         output = model(input_tensor)
         probs = torch.softmax(output, dim=1)[0]
         pred = int(torch.argmax(probs).item())
-    return {"label": _LABELS[pred], "score": float(probs[pred].item())}
+    label = _LABELS[pred]
+    score = float(probs[pred].item())
+
+    if _debug_count < MAX_DEBUG_FRAMES:
+        _debug_count += 1
+        fname = f"frame_{_debug_count:02d}_{label}_{score:.3f}.jpg"
+        img.save(DEBUG_DIR / fname, "JPEG", quality=90)
+        print(f"[debug] saved {fname} ({img.size[0]}x{img.size[1]})")
+
+    return {"label": label, "score": score}
