@@ -55,19 +55,45 @@ function injectOverlay(score) {
   if (document.querySelector(".sinasecure-warning")) {
     return;
   }
-  const div = document.createElement("div");
-  div.className = "sinasecure-warning";
   const pct = Math.round(score * 100);
-  const label = document.createElement("span");
-  label.textContent = "\u26A0 Deepfake detected (" + pct + "% confidence)";
-  const button = document.createElement("button");
-  button.textContent = "\u00D7";
-  button.addEventListener("click", () => {
-    div.remove();
-  });
-  div.appendChild(label);
-  div.appendChild(button);
-  document.body.appendChild(div);
+
+  const root = document.createElement("div");
+  root.className = "sinasecure-warning";
+  root.setAttribute("role", "alert");
+
+  const icon = document.createElement("div");
+  icon.className = "sinasecure-warning__icon";
+  icon.textContent = "\u26A0";
+
+  const body = document.createElement("div");
+  body.className = "sinasecure-warning__body";
+
+  const title = document.createElement("div");
+  title.className = "sinasecure-warning__title";
+  title.textContent = "Deepfake detected";
+
+  const subtitle = document.createElement("div");
+  subtitle.className = "sinasecure-warning__subtitle";
+  subtitle.textContent = "This video may be AI-manipulated \u2014 confidence ";
+  const conf = document.createElement("span");
+  conf.className = "sinasecure-warning__confidence";
+  conf.textContent = pct + "%";
+  subtitle.appendChild(conf);
+
+  body.appendChild(title);
+  body.appendChild(subtitle);
+
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "sinasecure-warning__close";
+  close.setAttribute("aria-label", "Dismiss warning");
+  close.textContent = "\u00D7";
+  close.addEventListener("click", () => root.remove());
+
+  root.appendChild(icon);
+  root.appendChild(body);
+  root.appendChild(close);
+  document.body.appendChild(root);
 }
 
 async function init() {
