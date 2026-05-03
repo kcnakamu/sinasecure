@@ -1,8 +1,12 @@
+from pathlib import Path
+import io
+
+import torch
+from torchvision import transforms
+from torchvision.models import efficientnet_b0, EfficientNet_B0_Weights
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from transformers import pipeline
 from PIL import Image
-import io
 
 app = FastAPI()
 
@@ -13,16 +17,40 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-detector = pipeline(
-    "image-classification",
-    model="prithivMLmods/Deep-Fake-Detector-v2-Model",
-)
+MODEL_PATH = Path(__file__).resolve().parent.parent / "model" / "best_model-v3.pt"
+
+
+def _load_model() -> torch.nn.Module:
+    weights = EfficientNet_B0_Weights.IMAGENET1K_V1
+    model = efficientnet_b0(weights=weights)
+    in_features = model.classifier[1].in_features
+    model.classifier = torch.nn.Sequential(
+        torch.nn.Dropout(0.4),
+        torch.nn.Linear(in_features, 2),
+    )
+    model.load_state_dict(torch.load(str(MODEL_PATH), map_location="cpu"))
+    model.eval()
+    return model
+
+
+model = _load_model()
+
+_transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+])
+
+_LABELS = ["Real", "Fake"]
 
 
 @app.post("/detect")
 async def detect(file: UploadFile = File(...)):
     raw = await file.read()
     img = Image.open(io.BytesIO(raw)).convert("RGB")
-    results = detector(img)
-    top = results[0]
-    return {"label": top["label"], "score": float(top["score"])}
+    input_tensor = _transform(img).unsqueeze(0)
+    with torch.no_grad():
+        output = model(input_tensor)
+        probs = torch.softmax(output, dim=1)[0]
+        pred = int(torch.argmax(probs).item())
+    return {"label": _LABELS[pred], "score": float(probs[pred].item())}
